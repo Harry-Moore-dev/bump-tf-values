@@ -1,0 +1,16 @@
+name: 'bump-tf-values'
+description: 'bump tf locals in a PR'
+inputs:
+  filepath:
+    description: 'filepath containing values to be bumped'
+    required: false
+    default: 'main.tf'
+  varname:
+    description: 'local name to be bumped'
+    required: true
+  value:
+    description: 'value of local to be set'
+    required: true
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

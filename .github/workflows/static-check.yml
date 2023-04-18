@@ -1,0 +1,12 @@
+name: "staticcheck"
+on: ["push", "pull_request"]
+
+jobs:
+  staticcheck:
+    name: "staticcheck"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          fetch-depth: 1
+      - uses: dominikh/staticcheck-action@v1.3.0

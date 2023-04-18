@@ -13,3 +13,10 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+bump-tf-values
+!*.*
+!*/
+.DS_Store
+.env
+*.tf
