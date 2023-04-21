@@ -8,8 +8,7 @@ ENV GO111MODULE=on CGO_ENABLED=0
 
 WORKDIR /
 
-# Copy the source code. Note the slash at the end, as explained in
-# https://docs.docker.com/engine/reference/builder/#copy
+# Copy the source code.
 COPY go.mod go.sum ./
 RUN go mod download
 COPY *.go ./
