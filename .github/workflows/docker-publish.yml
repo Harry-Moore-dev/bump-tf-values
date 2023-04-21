@@ -10,20 +10,20 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-      
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@4
         with:
           images: harrymooredev/bump-tf-values
-      
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
