@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"os"
 
@@ -19,15 +20,15 @@ func main() {
 	ctx := logger.WithContext(context.Background())
 
 	// check for command line flags
-	var debug bool
-	flag.BoolVar(&debug, "debug", false, "set log level to debug")
+	debug := flag.Bool("debug", false, "set log level to debug")
 	flag.Parse()
 
-	// set log level to warning unless in debug mode
-	zerolog.SetGlobalLevel(zerolog.WarnLevel)
-	if debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	// set log level
+	level := zerolog.WarnLevel
+	if *debug {
+		level = zerolog.DebugLevel
 	}
+	zerolog.SetGlobalLevel(level)
 
 	// load env vars
 	filePath := os.Getenv("INPUT_FILEPATH")
@@ -36,77 +37,85 @@ func main() {
 	log.Ctx(ctx).Debug().Str("filepath", filePath).Str("varname", varname).Str("value", value).Msg("env vars loaded")
 
 	// open specified Terraform file
+	err := updateHclFile(ctx, filePath, varname, value)
+	if err != nil {
+		log.Ctx(ctx).Err(err).Msg("failed to update HCL file")
+		return
+	}
+
+	log.Ctx(ctx).Info().Msg("file updated successfully")
+}
+
+// handles steps required to load, update and save the specified file
+func updateHclFile(ctx context.Context, filePath, varname, value string) error {
 	file, err := os.OpenFile(filePath, os.O_RDWR, 0600)
 	if err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error opening file %v", err)
+		return fmt.Errorf("failed to open file: %v", err)
 	}
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			log.Ctx(ctx).Err(err).Msgf("Error closing file %v", err)
+		}
+	}()
 
 	hclFile, err := parseHclFile(ctx, file)
 	if err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error parsing HCL file %v", err)
+		return fmt.Errorf("failed to parse HCL file: %v", err)
 	}
 
-	updateLocal(ctx, hclFile, varname, value)
-
-	saveHcl(file, ctx, hclFile)
-
-	err = file.Close()
-	if err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error closing file %v", err)
+	if err := updateLocal(ctx, hclFile, varname, value); err != nil {
+		return fmt.Errorf("failed to update local: %v", err)
 	}
+
+	if err := saveHCLToFile(file, ctx, hclFile); err != nil {
+		return fmt.Errorf("failed to save to file: %v", err)
+	}
+
+	return nil
 }
 
-// save hcl configuration to file
-func saveHcl(file *os.File, ctx context.Context, hclFile *hclwrite.File) {
-	// truncate & move pointer to start of file
-	err := file.Truncate(0)
-	if err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error truncating of file %v", err)
-	}
-	// move pointer to start of file
-	_, err = file.Seek(0, io.SeekStart)
-	if err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error seeking start of file %v", err)
+// saveHCLToFile saves HCL configuration to file.
+func saveHCLToFile(file *os.File, ctx context.Context, hclFile *hclwrite.File) error {
+	if err := file.Truncate(0); err != nil {
+		return fmt.Errorf("failed to truncate file: %w", err)
 	}
 
-	_, err = hclFile.WriteTo(file)
-	if err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error writing to file %v", err)
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to seek the start of file: %w", err)
 	}
+
+	if _, err := hclFile.WriteTo(file); err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	return nil
 }
 
-// load and parse file
+// parseHclFile reads and parses the content of the file as HCL format
 func parseHclFile(ctx context.Context, file *os.File) (*hclwrite.File, error) {
-
-	// Get the file size
-	fileInfo, err := file.Stat()
+	info, err := file.Stat()
 	if err != nil {
-		return nil, err
-	}
-	fileSize := fileInfo.Size()
-
-	// Initialize the content slice with the file size
-	content := make([]byte, fileSize)
-
-	bytes, err := file.Read(content)
-	log.Ctx(ctx).Debug().Msgf("Number of bytes loaded from hcl file %d", bytes)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	// Parse the file contents as HCL
-	hclFile, diags := hclwrite.ParseConfig(content, file.Name(), hcl.Pos{Line: 1, Column: 1})
+	content := make([]byte, info.Size())
+	if _, err := file.Read(content); err != nil {
+		return nil, fmt.Errorf("failed to read file content: %w", err)
+	}
+
+	// parse the file content into HCL format
+	hclFile, diags := hclwrite.ParseConfig(content, info.Name(), hcl.Pos{Line: 1, Column: 1})
 	if diags.HasErrors() {
-		return nil, diags
+		return nil, fmt.Errorf("failed to parse file content: %s", diags)
 	}
 
-	// Return the parsed HCL file
 	return hclFile, nil
 }
 
 // find local
 // modify local value in hclfile
-func updateLocal(ctx context.Context, file *hclwrite.File, varname string, value string) {
+func updateLocal(ctx context.Context, file *hclwrite.File, varname string, value string) error {
 	found := false
 	for _, block := range file.Body().Blocks() {
 		if block.Type() == "locals" {
@@ -114,10 +123,12 @@ func updateLocal(ctx context.Context, file *hclwrite.File, varname string, value
 			if local != nil {
 				found = true
 				block.Body().SetAttributeValue(varname, cty.StringVal(value))
+				break // exit loop once variable is found and updated
 			}
 		}
 	}
 	if !found {
-		log.Ctx(ctx).Error().Msgf("Local '%s' not found", varname)
+		return fmt.Errorf("local variable '%s' not found", varname)
 	}
+	return nil
 }
