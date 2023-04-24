@@ -169,3 +169,19 @@ func TestParseHclFile_InvalidFormat(t *testing.T) {
 	// assert that the error message contains the expected substring
 	assert.Contains(t, err.Error(), "failed to parse file content")
 }
+
+func TestParseHclFile_NilFile(t *testing.T) {
+
+	// pass in a nil file
+	var tmpFile *os.File
+
+	// call the function under test
+	hclFile, err := parseHclFile(context.Background(), tmpFile)
+
+	// assert that the function returns an error
+	assert.Error(t, err)
+	assert.Nil(t, hclFile)
+
+	// assert that the error message contains the expected substring
+	assert.Contains(t, err.Error(), "failed to get file info")
+}
