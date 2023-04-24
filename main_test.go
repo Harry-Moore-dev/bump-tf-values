@@ -114,7 +114,7 @@ func TestUpdateHclFileWithLocalErrorE2E(t *testing.T) {
 	_, err = file.WriteString(`locals {
 		# pin the target versions of the code
 		other_code_version = "3.3.3.3"
-	
+
 	  }
 
 	  output "test_version_string" {
