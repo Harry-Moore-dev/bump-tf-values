@@ -43,10 +43,11 @@ github.com/rs/zerolog/log
 # github.com/stretchr/testify v1.8.2
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
-# github.com/zclconf/go-cty v1.12.1
+# github.com/zclconf/go-cty v1.13.1
 ## explicit; go 1.18
 github.com/zclconf/go-cty/cty
 github.com/zclconf/go-cty/cty/convert
+github.com/zclconf/go-cty/cty/ctystrings
 github.com/zclconf/go-cty/cty/function
 github.com/zclconf/go-cty/cty/function/stdlib
 github.com/zclconf/go-cty/cty/gocty
