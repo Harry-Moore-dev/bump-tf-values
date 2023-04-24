@@ -80,11 +80,11 @@ func TestUpdateHclFileWithErrorE2E(t *testing.T) {
 		code_version       = "1.1.1.1"
 	  }
 
-	  output "test_version_string" 
+	  output "test_version_string"
 		value = var.other_code_version
-	  
 
-	  output "test_version_number" 
+
+	  output "test_version_number"
 		value = var.code_version
 	  }
 `)

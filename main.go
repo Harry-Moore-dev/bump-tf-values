@@ -52,7 +52,12 @@ func updateHclFile(ctx context.Context, filePath, varname, value string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file: %v", err)
 	}
-	defer file.Close()
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			log.Ctx(ctx).Err(err).Msgf("Error closing file %v", err)
+		}
+	}()
 
 	hclFile, err := parseHclFile(ctx, file)
 	if err != nil {
