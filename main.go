@@ -20,15 +20,15 @@ func main() {
 	ctx := logger.WithContext(context.Background())
 
 	// check for command line flags
-	var debug bool
-	flag.BoolVar(&debug, "debug", false, "set log level to debug")
+	debug := flag.Bool("debug", false, "set log level to debug")
 	flag.Parse()
 
-	// set log level to warning unless in debug mode
-	zerolog.SetGlobalLevel(zerolog.WarnLevel)
-	if debug {
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	// set log level
+	level := zerolog.WarnLevel
+	if *debug {
+		level = zerolog.DebugLevel
 	}
+	zerolog.SetGlobalLevel(level)
 
 	// load env vars
 	filePath := os.Getenv("INPUT_FILEPATH")
@@ -37,34 +37,37 @@ func main() {
 	log.Ctx(ctx).Debug().Str("filepath", filePath).Str("varname", varname).Str("value", value).Msg("env vars loaded")
 
 	// open specified Terraform file
+	err := updateHclFile(ctx, filePath, varname, value)
+	if err != nil {
+		log.Ctx(ctx).Err(err).Msg("failed to update HCL file")
+		return
+	}
+
+	log.Ctx(ctx).Info().Msg("file updated successfully")
+}
+
+// handles steps required to load, update and save the specified file
+func updateHclFile(ctx context.Context, filePath, varname, value string) error {
 	file, err := os.OpenFile(filePath, os.O_RDWR, 0600)
 	if err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error opening file %v", err)
+		return fmt.Errorf("failed to open file: %v", err)
 	}
-	defer func() {
-		err = file.Close()
-		if err != nil {
-			log.Ctx(ctx).Err(err).Msgf("Error closing file %v", err)
-		}
-	}()
+	defer file.Close()
 
 	hclFile, err := parseHclFile(ctx, file)
 	if err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error parsing HCL file: %v", err)
-		return
+		return fmt.Errorf("failed to parse HCL file: %v", err)
 	}
 
 	if err := updateLocal(ctx, hclFile, varname, value); err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error updating local: %v", err)
-		return
+		return fmt.Errorf("failed to update local: %v", err)
 	}
 
 	if err := saveHCLToFile(file, ctx, hclFile); err != nil {
-		log.Ctx(ctx).Err(err).Msgf("Error saving to file: %v", err)
-		return
+		return fmt.Errorf("failed to save to file: %v", err)
 	}
 
-	log.Ctx(ctx).Info().Msg("File updated successfully")
+	return nil
 }
 
 // saveHCLToFile saves HCL configuration to file.

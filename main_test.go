@@ -8,6 +8,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -61,7 +62,44 @@ func TestUpdateLocalE2E(t *testing.T) {
 	assert.Equal(t, string(happyTestFile), string(fileData), "Test file and expected file don't match")
 }
 
-func TestUpdateLocal_NotFound(t *testing.T) {
+func TestUpdateHclFileWithErrorE2E(t *testing.T) {
+
+	// create a logger
+	logger := log.With().Logger()
+	ctx := logger.WithContext(context.Background())
+
+	// create test file
+	file, err := os.CreateTemp("", "testhcl.tf")
+	assert.NoError(t, err, "Error creating test file")
+	defer os.Remove(file.Name()) // delete the file after the test finishes
+
+	// add data with invalid syntax
+	_, err = file.WriteString(`locals {
+		# pin the target versions of the code
+		other_code_version = "3.3.3.3"
+		code_version       = "1.1.1.1"
+	  }
+
+	  output "test_version_string" 
+		value = var.other_code_version
+	  
+
+	  output "test_version_number" 
+		value = var.code_version
+	  }
+`)
+	assert.NoError(t, err, "Error writing to test file")
+
+	file.Close()
+
+	// test
+	err = updateHclFile(ctx, file.Name(), "code_version", "v2.55.4")
+
+	// check if an error was logged
+	assert.ErrorContains(t, err, "failed to parse HCL file", "Expected an error parsing HCL file")
+}
+
+func TestUpdateLocalNotFound(t *testing.T) {
 
 	// Create a logger that writes to a buffer
 	buf := bytes.Buffer{}
@@ -142,7 +180,7 @@ func TestParseHclFile(t *testing.T) {
 	assert.NotNil(t, attr)
 }
 
-func TestParseHclFile_InvalidFormat(t *testing.T) {
+func TestParseHclFileInvalidFormat(t *testing.T) {
 	// create a temporary file with invalid HCL content
 	tmpFile, err := os.CreateTemp("", "testfile-*.hcl")
 	assert.NoError(t, err)
@@ -170,7 +208,7 @@ func TestParseHclFile_InvalidFormat(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to parse file content")
 }
 
-func TestParseHclFile_NilFile(t *testing.T) {
+func TestParseHclFileNilFile(t *testing.T) {
 
 	// pass in a nil file
 	var tmpFile *os.File
