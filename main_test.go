@@ -62,7 +62,7 @@ func TestUpdateLocalE2E(t *testing.T) {
 	assert.Equal(t, string(happyTestFile), string(fileData), "Test file and expected file don't match")
 }
 
-func TestUpdateHclFileWithErrorE2E(t *testing.T) {
+func TestUpdateHclFileWithFileErrorE2E(t *testing.T) {
 
 	// create a logger
 	logger := log.With().Logger()
@@ -97,6 +97,84 @@ func TestUpdateHclFileWithErrorE2E(t *testing.T) {
 
 	// check if an error was logged
 	assert.ErrorContains(t, err, "failed to parse HCL file", "Expected an error parsing HCL file")
+}
+
+func TestUpdateHclFileWithLocalErrorE2E(t *testing.T) {
+
+	// create a logger
+	logger := log.With().Logger()
+	ctx := logger.WithContext(context.Background())
+
+	// create test file
+	file, err := os.CreateTemp("", "testhcl.tf")
+	assert.NoError(t, err, "Error creating test file")
+	defer os.Remove(file.Name()) // delete the file after the test finishes
+
+	// add data with missing local
+	_, err = file.WriteString(`locals {
+		# pin the target versions of the code
+		other_code_version = "3.3.3.3"
+	
+	  }
+
+	  output "test_version_string" {
+		value = var.other_code_version
+	  }
+
+	  output "test_version_number" {
+		value = var.code_version
+	  }
+`)
+	assert.NoError(t, err, "Error writing to test file")
+
+	file.Close()
+
+	// test
+	err = updateHclFile(ctx, file.Name(), "code_version", "v2.55.4")
+
+	// check if an error was logged
+	assert.ErrorContains(t, err, "failed to update local", "Expected an error parsing HCL file")
+}
+
+func TestUpdateHclFileWithSaveErrorE2E(t *testing.T) {
+
+	// create a logger
+	logger := log.With().Logger()
+	ctx := logger.WithContext(context.Background())
+
+	// create test file
+	file, err := os.CreateTemp("", "testhcl.tf")
+	assert.NoError(t, err, "Error creating test file")
+	defer os.Remove(file.Name()) // delete the file after the test finishes
+
+	// add data with missing local
+	_, err = file.WriteString(`locals {
+		# pin the target versions of the code
+		other_code_version = "3.3.3.3"
+		code_version       = "1.1.1.1"
+	  }
+
+	  output "test_version_string" {
+		value = var.other_code_version
+	  }
+
+	  output "test_version_number" {
+		value = var.code_version
+	  }
+`)
+	assert.NoError(t, err, "Error writing to test file")
+
+	file.Close()
+
+	// make file readonly before attempting to write to it
+	err = os.Chmod(file.Name(), 0444)
+	assert.NoError(t, err, "Unable to set file as readonly")
+
+	// test
+	err = updateHclFile(ctx, file.Name(), "code_version", "v2.55.4")
+
+	// check if an error was logged
+	assert.Error(t, err, "Expected an error parsing HCL file")
 }
 
 func TestUpdateLocalNotFound(t *testing.T) {
