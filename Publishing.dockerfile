@@ -16,17 +16,11 @@ COPY *.go ./
 # Build
 RUN GOOS=linux go build -trimpath -a -ldflags "-s -w -extldflags '-static'" -o /bump-tf-values
 
-# Strip any symbols
-RUN strip /bump-tf-values
-
 # Compress the compiled action
 RUN upx -q -9 /bump-tf-values
 
 # Use  empty container
 FROM scratch
-
-# Copy over SSL certificates and root CA bundle.
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy over the compiled action from the first step
 COPY --from=builder /bump-tf-values /bump-tf-values
