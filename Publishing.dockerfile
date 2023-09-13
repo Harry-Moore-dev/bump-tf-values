@@ -1,4 +1,4 @@
-FROM golang:1.20 AS builder
+FROM golang:1.20-alpine AS builder
 
 # Install upx (upx.github.io) to compress the compiled action
 RUN apk add upx
