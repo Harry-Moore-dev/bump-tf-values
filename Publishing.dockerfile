@@ -1,7 +1,7 @@
 FROM golang:1.20 AS builder
 
 # Install upx (upx.github.io) to compress the compiled action
-RUN apt-get update && apt-get -y install upx
+RUN apk add upx
 
 # Turn on Go modules support and disable CGO
 ENV GO111MODULE=on CGO_ENABLED=0
