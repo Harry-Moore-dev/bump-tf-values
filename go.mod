@@ -6,7 +6,7 @@ require (
 	github.com/hashicorp/hcl/v2 v2.19.1
 	github.com/rs/zerolog v1.32.0
 	github.com/stretchr/testify v1.8.4
-	github.com/zclconf/go-cty v1.14.2
+	github.com/zclconf/go-cty v1.14.4
 )
 
 require (
